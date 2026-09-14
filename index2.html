@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+ <html>
+    <head>
+      <title>site2</title>
+      <link rel="stylesheet" href="style.css">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body>
+       <header>
+           <div class="">
+              <h1 class="titulo">Identificação de Objetos </h1>
+           </div>
+       </header>
+       <main>
+          <div class="texto">
+        
+            <video id="video" autoplay playsinline></video>
+           
+          </div>
+
+          <p id="resultado"></p>
+          <div class="container-vertical">
+            <canvas width="1280" height="720" id="frames" class="canva"></canvas>
+            <canvas width="1280" height="720" id="framesYolo" class="canva"></canvas>
+          </div>
+       </main>
+       <footer>
+    
+       </footer>
+       <script type="module" src="camera.js"></script>
+       <script type="module" src="capturaFrame.js"></script>  
+         <p class="copy">&copy; Otavio Moura, Sarah Calmon, Sophia Emanuelle Duarte. </p>
+    
+    </body>
+ </html>
