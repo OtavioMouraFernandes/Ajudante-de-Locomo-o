@@ -12,70 +12,32 @@ const canvasComparacao =
     document.getElementById("frames");
 
 const ctxComparacao =
-    canvasComparacao.getContext(
-        "2d",
-        { willReadFrequently: true }
-    );
+    canvasComparacao.getContext("2d");
 
 
-/* =====================================================================
-   CONFIGURAÇÕES
-   ===================================================================== */
+const MARGEM_ERRO = 13;
 
-// false = analisa continuamente, o mais rápido que o aparelho aguentar
-//         (mais seguro para quem anda).
-// true  = só analisa quando a imagem muda bastante (economiza bateria),
-//         mas pode "perder" um obstáculo que se aproxima devagar.
-const USAR_COMPARACAO_FRAMES = false;
+const INTERVALO_MONITORAMENTO = 300;
 
-// Só vale com USAR_COMPARACAO_FRAMES = true.
-// Diferença média de brilho (0-255) entre dois frames para considerar "mudou".
-// O valor antigo (13) era alto demais; 5 é um ponto de partida melhor.
-const MARGEM_ERRO = 5;
-
-// Só vale com USAR_COMPARACAO_FRAMES = true.
-// Mesmo sem mudança, analisa de novo depois deste tempo (ms).
-const INTERVALO_FORCADO_MS = 1500;
-
-// Pausa entre uma análise e outra (ms).
-const INTERVALO_MONITORAMENTO = 100;
-
-// Tempo entre os dois frames comparados (ms). Só vale com comparação ligada.
 const TEMPO_ENTRE_FRAMES = 200;
 
-// Quantas análises seguidas precisam ver o obstáculo para falar.
-// 1 = alerta imediato (mais falsos alarmes). 2 = mais confiável.
-const FRAMES_PARA_CONFIRMAR = 2;
-
-// Se o obstáculo continuar na frente, repete o aviso a cada X ms.
-const INTERVALO_REPETIR_ALERTA_MS = 3000;
-
-
-/* =====================================================================
-   ESTADO
-   ===================================================================== */
 
 // Referência ao elemento de vídeo. Só é preenchida
 // depois que a câmera estiver pronta (ver esperarCamera).
 let video;
 
+
 // Evita duas inferências simultâneas
 let processandoYolo = false;
 
-// Indica que há um alerta em andamento (obstáculo ainda na frente)
+
+// Impede ficar falando sem parar
 let alertaAtivo = false;
 
-// Indica se a primeira detecção já foi executada
+
+// Indica se o primeiro YOLO já foi executado
 let primeiraDeteccaoRealizada = false;
 
-// Quantas análises seguidas viram obstáculo próximo
-let framesConsecutivosPerto = 0;
-
-// Momento (ms) do último aviso falado
-let ultimoAlertaEm = 0;
-
-// Momento (ms) da última análise concluída
-let ultimaExecucaoEm = 0;
 
 
 function sleep(ms) {
@@ -86,58 +48,6 @@ function sleep(ms) {
 }
 
 
-/* =====================================================================
-   VOZ
-   ===================================================================== */
-
-// Navegadores de celular só liberam a voz depois de um toque do usuário.
-// Este "toque qualquer" na tela destrava a fala.
-function desbloquearVoz() {
-
-    if ("speechSynthesis" in window) {
-
-        const mudo =
-            new SpeechSynthesisUtterance("");
-
-        mudo.volume = 0;
-
-        speechSynthesis.speak(mudo);
-    }
-}
-
-["click", "touchstart", "keydown"].forEach(evento =>
-    document.addEventListener(
-        evento,
-        desbloquearVoz,
-        { once: true }
-    )
-);
-
-
-function falar(texto) {
-
-    if (!("speechSynthesis" in window)) {
-
-        console.log("Speech Synthesis não disponível.");
-        return;
-    }
-
-    speechSynthesis.cancel();
-
-    const fala =
-        new SpeechSynthesisUtterance(texto);
-
-    fala.lang = "pt-BR";
-    fala.rate = 1.1;
-    fala.volume = 1;
-
-    speechSynthesis.speak(fala);
-}
-
-
-/* =====================================================================
-   CÂMERA E COMPARAÇÃO DE FRAMES
-   ===================================================================== */
 
 async function esperarCamera() {
 
@@ -180,6 +90,7 @@ async function esperarCamera() {
 }
 
 
+
 function capturarFrameComparacao() {
 
     ctxComparacao.filter =
@@ -202,7 +113,6 @@ function capturarFrameComparacao() {
         canvasComparacao.height
     );
 }
-
 
 async function compararFrames() {
 
@@ -227,25 +137,37 @@ async function compararFrames() {
     let diferencaTotal = 0;
 
 
-    // Cada pixel ocupa 4 posições (R,G,B,A). Pulando de 16 em 16,
-    // analisamos 1 a cada 4 pixels (basta o canal R, pois a imagem é cinza).
+    /*
+        Em vez de analisar todos os pixels,
+        analisamos um a cada 4 pixels.
+    */
+
     for (
         let i = 0;
         i < pixels1.length;
         i += 16
     ) {
 
-        diferencaTotal +=
-            Math.abs(pixels1[i] - pixels2[i]);
+        const diferenca =
+            Math.abs(
+                pixels1[i] -
+                pixels2[i]
+            );
+
+
+        diferencaTotal += diferenca;
     }
 
 
     const quantidadeAmostras =
-        Math.ceil(pixels1.length / 16);
+        Math.ceil(
+            pixels1.length / 16
+        );
 
 
     const diferencaMedia =
-        diferencaTotal / quantidadeAmostras;
+        diferencaTotal /
+        quantidadeAmostras;
 
 
     console.log(
@@ -258,9 +180,6 @@ async function compararFrames() {
 }
 
 
-/* =====================================================================
-   DETECÇÃO
-   ===================================================================== */
 
 async function executarYolo() {
 
@@ -286,146 +205,139 @@ async function executarYolo() {
         );
 
 
-        console.log("Executando detecção...");
+        console.log(
+            "Executando YOLO..."
+        );
 
 
         const deteccoes =
             await deteccao(canvas);
 
 
-        verificarProximidade(deteccoes);
+        verificarProximidade(
+            deteccoes
+        );
 
 
-        if (!primeiraDeteccaoRealizada) {
-
-            primeiraDeteccaoRealizada = true;
-
-            falar("Sistema pronto.");
-        }
+        primeiraDeteccaoRealizada = true;
 
 
     } catch (erro) {
 
         console.error(
-            "Erro na detecção:",
+            "Erro no YOLO:",
             erro
         );
 
     } finally {
 
         processandoYolo = false;
-
-        ultimaExecucaoEm = Date.now();
     }
 }
-
 
 function verificarProximidade(deteccoes) {
 
-    const proximos =
-        deteccoes.filter(objeto => objeto.muitoProximo);
+    let encontrouObjetoProximo =
+        false;
 
 
-    // Caminho livre: zera tudo para o próximo obstáculo avisar na hora.
-    if (proximos.length === 0) {
+    for (const objeto of deteccoes) {
 
-        console.log("Não há objeto próximo");
+        console.log(
+            `${objeto.classe} | ` +
+            `largura: ${objeto.largura.toFixed(2)} | ` +
+            `altura: ${objeto.altura.toFixed(2)} | ` +
+            `muito próximo: ${objeto.muitoProximo}`
+        );
 
-        framesConsecutivosPerto = 0;
-        alertaAtivo = false;
-        ultimoAlertaEm = 0;
 
-        return;
+        if (objeto.muitoProximo) {
+
+            encontrouObjetoProximo =
+                true;
+
+
+            console.log(
+                "⚠️ OBSTÁCULO MUITO PRÓXIMO:",
+                objeto.classe
+            );
+
+
+            if (!alertaAtivo) {
+
+                emitirAlerta();
+            }
+
+
+            break;
+        }
     }
 
+    if (!encontrouObjetoProximo) {
 
-    framesConsecutivosPerto++;
+        alertaAtivo = false;
+    }
+}
 
 
-    // Escolhe o mais perigoso: menor distância conhecida primeiro.
-    // Quem não tem distância (profundidade) fica por último.
-    proximos.sort((a, b) =>
-        (a.distanciaM ?? 99) - (b.distanciaM ?? 99)
-    );
 
-    const alvo = proximos[0];
+function emitirAlerta() {
+
+    alertaAtivo = true;
 
 
     console.log(
-        "⚠️ OBSTÁCULO PRÓXIMO:",
-        alvo.classe,
-        "| origem:", alvo.origem,
-        "| direção:", alvo.direcao,
-        "| confirmações:", framesConsecutivosPerto
+        "🚨 ALERTA EMITIDO"
     );
 
 
-    // Ainda não confirmou em análises suficientes (evita falso alarme).
-    if (framesConsecutivosPerto < FRAMES_PARA_CONFIRMAR) {
-        return;
-    }
-
-
-    const agora = Date.now();
+    // ==========================
+    // VOZ
+    // ==========================
 
     if (
-        !alertaAtivo ||
-        agora - ultimoAlertaEm >= INTERVALO_REPETIR_ALERTA_MS
+        "speechSynthesis" in window
     ) {
 
-        emitirAlerta(alvo);
-    }
-}
+        speechSynthesis.cancel();
 
 
-function montarFrase(alvo) {
-
-    const lugar = {
-        esquerda: "à esquerda",
-        frente: "à frente",
-        direita: "à direita"
-    }[alvo.direcao] || "à frente";
+        const fala =
+            new SpeechSynthesisUtterance(
+                "Atenção. Obstáculo muito próximo."
+            );
 
 
-    if (alvo.origem === "yolo") {
+        fala.lang =
+            "pt-BR";
 
-        let distancia = "";
+        fala.rate =
+            1.1;
 
-        if (alvo.distanciaM !== null) {
+        fala.volume =
+            1;
 
-            // Arredonda para múltiplos de 0,5 m ("1,5 metros").
-            const metros =
-                (Math.round(alvo.distanciaM * 2) / 2)
-                    .toString()
-                    .replace(".", ",");
 
-            distancia = `, a cerca de ${metros} metros`;
-        }
+        speechSynthesis.speak(
+            fala
+        );
 
-        return `Atenção. ${alvo.nomePt} ${lugar}${distancia}.`;
+    } else {
+
+        console.log(
+            "Speech Synthesis não disponível."
+        );
     }
 
-    return `Atenção. Obstáculo muito próximo ${lugar}.`;
-}
+    if (
+        "vibrate" in navigator
+    ) {
 
-
-function emitirAlerta(alvo) {
-
-    alertaAtivo = true;
-    ultimoAlertaEm = Date.now();
-
-
-    const frase = montarFrase(alvo);
-
-    console.log("🚨 ALERTA EMITIDO:", frase);
-
-
-    falar(frase);
-
-
-    if ("vibrate" in navigator) {
-
-        navigator.vibrate([300, 150, 300]);
+        navigator.vibrate([
+            300,
+            150,
+            300
+        ]);
 
     } else {
 
@@ -435,19 +347,18 @@ function emitirAlerta(alvo) {
     }
 }
 
-
-/* =====================================================================
-   LAÇO PRINCIPAL
-   ===================================================================== */
-
 export async function IniciarMonitoramento() {
 
-    console.log("Monitoramento iniciado.");
+    console.log(
+        "Monitoramento iniciado."
+    );
 
 
     await esperarCamera();
 
-    console.log("Realizando primeira detecção...");
+    console.log(
+        "Realizando primeira detecção..."
+    );
 
 
     await executarYolo();
@@ -457,24 +368,18 @@ export async function IniciarMonitoramento() {
 
         try {
 
-            let deveExecutar = true;
+            const diferenca =
+                await compararFrames();
 
+            if (
+                diferenca > MARGEM_ERRO &&
+                !processandoYolo
+            ) {
 
-            if (USAR_COMPARACAO_FRAMES) {
+                console.log(
+                    "Alteração significativa detectada."
+                );
 
-                const diferenca =
-                    await compararFrames();
-
-                const tempoParado =
-                    Date.now() - ultimaExecucaoEm;
-
-                deveExecutar =
-                    diferenca > MARGEM_ERRO ||
-                    tempoParado > INTERVALO_FORCADO_MS;
-            }
-
-
-            if (deveExecutar && !processandoYolo) {
 
                 await executarYolo();
             }
@@ -487,11 +392,14 @@ export async function IniciarMonitoramento() {
                 erro
             );
 
+
             await sleep(1000);
         }
 
 
-        await sleep(INTERVALO_MONITORAMENTO);
+        await sleep(
+            INTERVALO_MONITORAMENTO
+        );
     }
 }
 
