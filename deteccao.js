@@ -17,7 +17,6 @@ const MODELO_PROFUNDIDADE = "onnx-community/depth-anything-v2-small";
 // Tenta usar a placa de vídeo (WebGPU). Se o navegador não suportar,
 // ou der erro ao carregar, cai automaticamente para o modo normal (wasm).
 // Se aparecerem erros estranhos durante a inferência, troque para false.
-const USAR_WEBGPU = true;
 
 // ---------- YOLO (reconhece objetos conhecidos) ----------
 // Antes era 0.6. Valores menores detectam mais coisas (e mais falsos positivos).
@@ -142,13 +141,7 @@ const NOMES_PT = {
    CARREGAMENTO DOS MODELOS
    ===================================================================== */
 
-const dispositivo =
-    (USAR_WEBGPU && "gpu" in navigator) ? "webgpu" : "wasm";
-
-console.log("Dispositivo de inferência:", dispositivo);
-
-
-// Tenta carregar com o dispositivo escolhido; se falhar, usa o padrão.
+const dispositivo = "wasm";
 async function comFallback(carregar) {
 
     try {
